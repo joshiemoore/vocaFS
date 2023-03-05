@@ -173,6 +173,9 @@ class VocaFS(pyfuse3.Operations):
         self.inode_open_count[inode] += 1
         return pyfuse3.FileInfo(fh=inode)
 
+    async def release(self, fh):
+        self.inode_open_count[fh] -= 1
+
     async def access(self, inode, mode, ctx):
         return True
 
