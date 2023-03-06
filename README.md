@@ -5,6 +5,8 @@ them to a block device. As a result, we can use Vocaroo as our own free cloud st
 vocaFS is an experimental work-in-progress prototype and should not be used for anything that actually matters. Also,
 this is mostly intended as an academic exercise, not for actually abusing Vocaroo in this way.
 
+vocaFS is Free Software, licensed under the terms of GNU GPLv3.
+
 ### Usage
 1. Clone this repository
 2. Install requirements: `$ python3 -m pip install requirements.txt`
