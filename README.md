@@ -8,6 +8,8 @@ this is mostly intended as an academic exercise, not for actually abusing Vocaro
 vocaFS is Free Software, licensed under the terms of GNU GPLv3.
 
 ### Usage
+vocaFS will only work on a GNU/Linux operating system with FUSE available.
+
 1. Clone this repository
 2. Install requirements: `$ python3 -m pip install requirements.txt`
 3. Create an empty directory to mount vocaFS to, e.g. `$ mkdir voca`
@@ -15,6 +17,8 @@ vocaFS is Free Software, licensed under the terms of GNU GPLv3.
 
 Now, when you write files into the `voca` directory, they will be streamed to Vocaroo. When you go back and read these
 files later, they will be streamed from Vocaroo. Vocaroo is cloud storage!
+
+When you are done, unmount vocaFS: `$ fusermount -u voca`
 
 ### How does it work?
 This project uses pyfuse, the Python bindings for libfuse, to implement the meat of the virtual filesystem operations.
