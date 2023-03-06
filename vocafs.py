@@ -10,15 +10,16 @@ import time
 import trio
 
 from vocafsnode import VocaFSNode
+from vocaroostream import VocarooUploadStream, VocarooDownloadStream
 
 
+MP3_HEADER = b'\xFF\xFB\xA0\x40'
 MAX_INODES = 65535
 
 
 class VocaFS(pyfuse3.Operations):
     def __init__(self, inode_dict=None):
         super(pyfuse3.Operations, self).__init__()
-        self.inode_open_count = defaultdict(int)
         if inode_dict:
             self.inode_dict = inode_dict
         else:
@@ -154,7 +155,6 @@ class VocaFS(pyfuse3.Operations):
 
     async def create(self, inode_parent, name, mode, flags, ctx):
         entry = await self._create(inode_parent, name, mode, ctx)
-        self.inode_open_count[entry.st_ino] += 1
         return (pyfuse3.FileInfo(fh=entry.st_ino), entry)
 
     async def unlink(self, inode_p, name, ctx):
@@ -170,14 +170,31 @@ class VocaFS(pyfuse3.Operations):
         await self._remove(inode_p, name, entry)
 
     async def open(self, inode, flags, ctx):
-        self.inode_open_count[inode] += 1
         return pyfuse3.FileInfo(fh=inode)
 
     async def release(self, fh):
-        self.inode_open_count[fh] -= 1
+        fsnode = self.inode_dict[fh]
+        if fsnode.upload_stream:
+            fsnode.upload_stream.flush()
+            fsnode.upload_stream.close()
+            fsnode.upload_stream = None
 
     async def access(self, inode, mode, ctx):
         return True
+
+    async def write(self, fh, offset, buf):
+        fsnode = self.inode_dict[fh]
+        if not fsnode.upload_stream:
+            if fsnode.media_id:
+                raise pyfuse3.FUSEError(errno.EIO)
+            fsnode.upload_stream = VocarooUploadStream(fsnode)
+        return fsnode.upload_stream.write(buf)
+
+    async def read(self, fh, offset, length):
+        fsnode = self.inode_dict[fh]
+        data = VocarooDownloadStream(fsnode).read()
+        print(data[offset:offset+length])
+        return data[offset:offset+length]
 
 
 if __name__ == '__main__':

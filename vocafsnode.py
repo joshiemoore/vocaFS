@@ -10,4 +10,8 @@ class VocaFSNode:
         self.gid = None
         self.rdev = 0
         self.target = 0
+
         self.name = ''
+        self.media_id = None
+        self.owner_token = None
+        self.upload_stream = None
