@@ -11,7 +11,19 @@ class VocaFSNode:
         self.rdev = 0
         self.target = 0
 
-        self.name = ''
+        self.name = b''
         self.media_id = None
         self.owner_token = None
         self.upload_stream = None
+
+    def serialize(self):
+        data = self.__dict__.copy()
+        del data['upload_stream']
+        data['name'] = data['name'].decode('utf-8')
+        return data
+
+    def deserialize(self, data):
+        for key in data:
+            if hasattr(self, key):
+                setattr(self, key, data[key])
+        self.name = str.encode(self.name)

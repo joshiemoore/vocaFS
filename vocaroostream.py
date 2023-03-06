@@ -51,8 +51,6 @@ class VocarooUploadStream(io.RawIOBase):
         self.fsnode.media_id = resp_data['mediaId']
         self.fsnode.owner_token = resp_data['ownerToken']
         self.fsnode.size = self.bytes_written
-        print(self.fsnode.media_id)
-        print(self.fsnode.owner_token)
         super().close()
 
     def _write(self, b):
@@ -95,7 +93,6 @@ class VocarooDownloadStream(io.RawIOBase):
                 'Sec-Fetch-Site': 'same-site'
             }
         )
-        print(resp.status_code)
         if resp.status_code != 200:
             raise pyfuse3.FUSEError(errno.EIO)
         return resp.content[4:]

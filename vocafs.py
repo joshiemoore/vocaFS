@@ -3,6 +3,7 @@
 import argparse
 from collections import defaultdict
 import errno
+import json
 import os
 import pyfuse3
 import stat
@@ -15,6 +16,7 @@ from vocaroostream import VocarooUploadStream, VocarooDownloadStream
 
 MP3_HEADER = b'\xFF\xFB\xA0\x40'
 MAX_INODES = 65535
+INODE_FILE = 'inodes.json'
 
 
 class VocaFS(pyfuse3.Operations):
@@ -35,6 +37,23 @@ class VocaFS(pyfuse3.Operations):
             self.inode_dict = {
                 pyfuse3.ROOT_INODE: root_dir
             }
+
+    def save_inodes(inode_dict):
+        result = {}
+        for inode_key in inode_dict:
+            result[inode_key] = inode_dict[inode_key].serialize()
+        with open(INODE_FILE, 'w') as f:
+            f.write(json.dumps(result))
+
+    def load_inodes():
+        inodes = {}
+        with open(INODE_FILE, 'r') as f:
+            inode_json = json.loads(f.read())
+            for inode_key in inode_json:
+                inode = VocaFSNode()
+                inode.deserialize(inode_json[inode_key])
+                inodes[int(inode_key)] = inode
+        return inodes
 
     def get_inode(self):
         for i in range(1, MAX_INODES):
@@ -62,15 +81,18 @@ class VocaFS(pyfuse3.Operations):
         fsnode.rdev = rdev
         fsnode.target = target
 
+        VocaFS.save_inodes(self.inode_dict)
         return await self.getattr(inode)
 
     async def _remove(self, inode_p, name, entry):
+        # TODO delete file from vocaroo too
         for inode_key in self.inode_dict:
             if self.inode_dict[inode_key].parent_inode == entry.st_ino:
                 raise pyfuse3.FUSEError(errno.ENOTEMPTY)
         delete_inodes = [key for key in self.inode_dict if self.inode_dict[key].parent_inode == inode_p and self.inode_dict[key].name == name]
         for key in delete_inodes:
             del self.inode_dict[key]
+        VocaFS.save_inodes(self.inode_dict)
 
     async def getattr(self, inode, ctx=None):
         entry = pyfuse3.EntryAttributes()
@@ -178,6 +200,7 @@ class VocaFS(pyfuse3.Operations):
             fsnode.upload_stream.flush()
             fsnode.upload_stream.close()
             fsnode.upload_stream = None
+            VocaFS.save_inodes(self.inode_dict)
 
     async def access(self, inode, mode, ctx):
         return True
@@ -186,14 +209,13 @@ class VocaFS(pyfuse3.Operations):
         fsnode = self.inode_dict[fh]
         if not fsnode.upload_stream:
             if fsnode.media_id:
-                raise pyfuse3.FUSEError(errno.EIO)
+                raise pyfuse3.FUSEError(errno.EROFS)
             fsnode.upload_stream = VocarooUploadStream(fsnode)
         return fsnode.upload_stream.write(buf)
 
     async def read(self, fh, offset, length):
         fsnode = self.inode_dict[fh]
         data = VocarooDownloadStream(fsnode).read()
-        print(data[offset:offset+length])
         return data[offset:offset+length]
 
 
@@ -205,9 +227,12 @@ if __name__ == '__main__':
         help='Enable FUSE debugging output')
     args = parser.parse_args()
 
-    # TODO load inode dict from inodes.json
+    try:
+        inodes = VocaFS.load_inodes()
+        vocafs = VocaFS(inodes)
+    except FileNotFoundError:
+        vocafs = VocaFS()
 
-    vocafs = VocaFS()
     fuse_options = set(pyfuse3.default_options)
     if args.debug_fuse:
         fuse_options.add('debug')
